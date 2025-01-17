@@ -3,13 +3,36 @@ import axios from 'axios';
 
 const BitcoinVisualization = () => {
   const [blockHeight, setBlockHeight] = useState(null);
+  const [latestBlock, setLatestBlock] = useState(null);
 
   useEffect(() => {
     const fetchBitcoinData = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/api/bitcoin'); // Call the backend.
-        setBlockHeight(response.data.height); // Save the block height.
-      } catch (error) {
+        // Fetch the latest block height using Blockstream API
+        const blockHeightResponse = await axios.get(
+          'https://blockstream.info/api/blocks/tip/height'
+        );
+        const height = Number(blockHeightResponse.data); // Ensure it's a number
+
+        // Check if height is a valid number
+        if (typeof height === 'number' && !isNaN(height)) {
+          setBlockHeight(height);
+
+          // Now fetch the block hash for this block height
+          const blockHashResponse = await axios.get(
+            `https://blockstream.info/api/block-height/${height}`
+          );
+          const blockHash = blockHashResponse.data;
+
+          // Fetch block details using the block hash
+          const blockDetailsResponse = await axios.get(
+            `https://blockstream.info/api/block/${blockHash}`
+          );
+          setLatestBlock(blockDetailsResponse.data); 
+      } else {
+        console.error('Invalid block height received');
+      } 
+    }catch (error) {
         console.error('Error fetching Bitcoin data:', error);
       }
     };
@@ -19,9 +42,20 @@ const BitcoinVisualization = () => {
 
   return (
     <div>
-      <h1>Bitcoin Block Height</h1>
-      {blockHeight ? (
-        <p>Current Block Height: {blockHeight}</p>
+      <h1>Bitcoin Block Visualization</h1>
+      {blockHeight !== null ? (
+        <div>
+          <p>Current Block Height: {blockHeight}</p>
+          {latestBlock && (
+            <div>
+              <h2>Latest Block Details</h2>
+              <p>Block Hash: {latestBlock.id}</p>
+              <p>Transactions: {latestBlock.tx_count}</p>
+              <p>Block Size: {latestBlock.size} bytes</p>
+              <p>Timestamp: {new Date(latestBlock.timestamp * 1000).toLocaleString()}</p>
+            </div>
+          )}
+        </div>
       ) : (
         <p>Loading...</p>
       )}
